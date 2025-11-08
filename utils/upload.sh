@@ -33,6 +33,7 @@ python utils/filter.py data/merged/all_conversations_partitioned.json data/merge
   --start-date "2022-01-01T00:00:00+00:00" \
   --end-date "2025-11-01T23:59:59+00:00" \
 #   --time-of-day morning afternoon night \
+  --source discord imessage instagram \
 #   --num-participants-min 2 \
 #   --num-participants-max 10 \
   --my-avg-message-length-min 10 \

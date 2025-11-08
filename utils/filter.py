@@ -6,6 +6,7 @@ Supports filtering by:
 - Start/end dates
 - Excluded recipients
 - Time of day (morning, afternoon, night) in Pacific timezone
+- Source (discord, imessage, instagram)
 - Number of participants
 - Average length of my messages (words)
 - My proportion of turns
@@ -133,6 +134,7 @@ def filter_conversations(
     end_date: Optional[str] = None,
     exclude_recipients: Optional[List[str]] = None,
     time_of_day: Optional[List[str]] = None,
+    source: Optional[List[str]] = None,
     num_participants_min: Optional[int] = None,
     num_participants_max: Optional[int] = None,
     my_avg_message_length_min: Optional[float] = None,
@@ -149,6 +151,7 @@ def filter_conversations(
         end_date: ISO 8601 date string - filter conversations ending before this date
         exclude_recipients: List of recipient names to exclude
         time_of_day: List of time periods ("morning", "afternoon", "night") in Pacific timezone
+        source: List of sources to include ("discord", "imessage", "instagram")
         num_participants_min: Minimum number of participants (inclusive)
         num_participants_max: Maximum number of participants (inclusive)
         my_avg_message_length_min: Minimum average word count of my messages
@@ -206,6 +209,12 @@ def filter_conversations(
         # Filter by time of day
         if time_of_day:
             if not conversation_has_time_of_day(conv, time_of_day):
+                continue
+        
+        # Filter by source
+        if source:
+            conv_source = conv.get('source')
+            if conv_source not in source:
                 continue
         
         # Filter by number of participants
@@ -275,6 +284,13 @@ def main():
         help='Time of day periods to include (morning, afternoon, night) in Pacific timezone'
     )
     parser.add_argument(
+        '--source',
+        type=str,
+        nargs='+',
+        choices=['discord', 'imessage', 'instagram'],
+        help='Sources to include (discord, imessage, instagram)'
+    )
+    parser.add_argument(
         '--num-participants-min',
         type=int,
         help='Minimum number of participants (inclusive)'
@@ -325,6 +341,7 @@ def main():
         end_date=args.end_date,
         exclude_recipients=args.exclude_recipients,
         time_of_day=args.time_of_day,
+        source=args.source,
         num_participants_min=args.num_participants_min,
         num_participants_max=args.num_participants_max,
         my_avg_message_length_min=args.my_avg_message_length_min,
