@@ -4,14 +4,14 @@ Convert your Instagram message data into OpenAI-compatible chat format for train
 
 ## Features
 
-- ✅ Parses Instagram's exported message.json files
-- ✅ Handles Unicode encoding issues in Instagram exports
-- ✅ Converts to OpenAI chat format with proper role assignments for training
-- ✅ Supports both individual and group conversations
-- ✅ Filters out non-content messages (like "Liked a message")
-- ✅ Chronological message ordering
-- ✅ Time-based filtering (train on specific date ranges)
-- ✅ Two output modes: combined or separate files
+- Parses Instagram's exported message.json files
+- Handles Unicode encoding issues in Instagram exports
+- Converts to OpenAI chat format with proper role assignments for training
+- Supports both individual and group conversations
+- Filters out non-content messages (like "Liked a message")
+- Chronological message ordering
+- Time-based filtering (train on specific date ranges)
+- Two output modes: combined or separate files
 
 ## Installation
 
