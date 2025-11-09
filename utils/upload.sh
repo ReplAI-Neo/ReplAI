@@ -4,7 +4,7 @@ set -u  # Exit on undefined variable
 
 # process
 echo "Step 1/5: Processing conversations..."
-bash utils/parse_discord.sh
+# bash utils/parse_discord.sh
 # bash parse_imessage.sh
 # bash parse_instagram.sh
 echo "✓ Processing complete"
@@ -30,17 +30,15 @@ echo "✓ Partition complete"
 # filter
 echo "Step 4/5: Filtering conversations..."
 python utils/filter.py data/merged/all_conversations_partitioned.json data/merged/all_conversations_partitioned_filtered.json \
-  --start-date "2022-01-01T00:00:00+00:00" \
+  --start-date "2023-01-01T00:00:00+00:00" \
   --end-date "2025-11-01T23:59:59+00:00" \
-#   --time-of-day morning afternoon night \
   --source discord imessage instagram \
-#   --num-participants-min 2 \
-#   --num-participants-max 10 \
-  --my-avg-message-length-min 10 \
-  --my-avg-message-length-max 100 \
-  --my-turn-proportion-min 10 \
-  --my-turn-proportion-max 90 \
   --pretty
+#   --time-of-day morning afternoon night
+#   --num-participants-min 2
+#   --num-participants-max 10
+#   --my-turn-proportion-min 10 \
+#   --my-turn-proportion-max 90 \
 if [ ! -f "data/merged/all_conversations_partitioned_filtered.json" ]; then
     echo "Error: filter failed - output file not found"
     exit 1
