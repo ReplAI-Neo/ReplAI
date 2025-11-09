@@ -9,7 +9,7 @@ dotenv.config();
 const execAsync = promisify(exec);
 
 // Configuration
-const POLL_INTERVAL_MS = 2000; // Check every 2 seconds
+const POLL_INTERVAL_MS = 3000; // Check every 3 seconds
 const MAX_QUEUE_SIZE = 8; // Max chats to respond to at once
 const MAX_HISTORY_LENGTH = 50; // Max messages per chat history
 
@@ -17,6 +17,7 @@ const SYSTEM_PROMPT = `You are texting casually with a friend. Keep it real and 
 
 Style:
 - all lowercase, casual typing
+- use lowercase "i" instead of "I" (e.g., "i think" not "I think")
 - use slang naturally (lol, tbh, ngl, etc)
 - dont overuse emojis - maybe one occasionally, not in every message
 - be brief and natural, like actual texting
