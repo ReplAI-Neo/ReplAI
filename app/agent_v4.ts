@@ -101,6 +101,7 @@ interface ChatState {
   abortController: AbortController | null;
   debounceTimer: NodeJS.Timeout | null;
   lastMessageTime: number;
+  isActive: boolean; // Whether AI is actively responding (toggled by START/STOP)
 }
 
 // Global state
@@ -147,6 +148,33 @@ async function getNewMessages(
   );
 
   return filtered;
+}
+
+async function getMessageHistory(
+  client: BeeperDesktop,
+  chatId: string,
+  limit: number = 50
+): Promise<Message[]> {
+  const encodedChatId = encodeURIComponent(chatId);
+  const response = (await client.get(`/v1/chats/${encodedChatId}/messages`, {
+    query: { limit },
+  })) as any;
+
+  const messages = response.items || [];
+
+  // Filter out system messages and empty messages
+  const filtered = messages.filter(
+    (msg: Message) =>
+      msg.text &&
+      msg.text.trim().length > 0 &&
+      !msg.text.startsWith("{") &&
+      !msg.text.includes('"textEntities"') &&
+      !msg.text.includes("START") && // Exclude START triggers from history
+      !msg.text.includes("STOP") // Exclude STOP triggers from history
+  );
+
+  // Return in chronological order (oldest first)
+  return filtered.reverse();
 }
 
 async function retrieveMemory(
@@ -338,21 +366,40 @@ async function sendMessage(
   });
 }
 
-function getOrCreateChatState(
+async function getOrCreateChatState(
+  beeper: BeeperDesktop,
   chatId: string,
   contactName: string,
   startingSortKey: number
-): ChatState {
+): Promise<ChatState> {
   if (!activeChats.has(chatId)) {
+    console.log(`📚 Loading message history for ${contactName}...`);
+    
+    // Load previous message history
+    const history = await getMessageHistory(beeper, chatId, MAX_HISTORY_LENGTH);
+    
+    const conversationHistory: { role: "user" | "assistant"; content: string }[] = [];
+    
+    // Convert message history to conversation format
+    for (const msg of history) {
+      conversationHistory.push({
+        role: msg.isSender ? "assistant" : "user",
+        content: msg.text || "",
+      });
+    }
+    
+    console.log(`✅ Loaded ${conversationHistory.length} previous messages for ${contactName}`);
+    
     activeChats.set(chatId, {
       chatId,
       contactName,
       lastSeenSortKey: startingSortKey,
-      conversationHistory: [],
+      conversationHistory,
       isGenerating: false,
       abortController: null,
       debounceTimer: null,
       lastMessageTime: 0,
+      isActive: false, // AI starts inactive until START is sent
     });
   }
   return activeChats.get(chatId)!;
@@ -401,11 +448,13 @@ async function processResponseQueue(
       state.abortController.signal
     );
 
-    // Add to history
-    state.conversationHistory.push({
-      role: "assistant",
-      content: response,
-    });
+    // Add to history (skip control messages)
+    if (response !== "ai activated" && response !== "ai deactivated") {
+      state.conversationHistory.push({
+        role: "assistant",
+        content: response,
+      });
+    }
 
     // Split on custom delimiter + newlines so each line is its own message
     const messages = response
@@ -457,6 +506,7 @@ async function runAgent() {
   console.log("🤖 AI Agent V4 started");
   console.log("📱 Monitoring ALL chats for unread messages");
   console.log(`📊 Max queue size: ${MAX_QUEUE_SIZE}`);
+  console.log("🎮 Send 'START' to activate AI, 'STOP' to deactivate");
   console.log("Press Ctrl+C to stop\n");
 
   const agentStartTime = Date.now();
@@ -496,7 +546,8 @@ async function runAgent() {
 
         if (newMessages.length > 0) {
           // Only create state if we actually have new messages
-          const state = getOrCreateChatState(
+          const state = await getOrCreateChatState(
+            beeper,
             chat.id,
             contactName,
             lastSeenSortKey
@@ -517,7 +568,23 @@ async function runAgent() {
             );
           }
 
-          // Add messages to history
+          // Check for START/STOP commands first
+          const hasStart = newMessages.some((msg) => msg.text?.includes("START"));
+          const hasStop = newMessages.some((msg) => msg.text?.includes("STOP"));
+
+          if (hasStart) {
+            state.isActive = true;
+            await sendMessage(beeper, state.chatId, "ai activated");
+            console.log(`✅ AI activated for ${state.contactName}`);
+          }
+
+          if (hasStop) {
+            state.isActive = false;
+            await sendMessage(beeper, state.chatId, "ai deactivated");
+            console.log(`⏸️  AI deactivated for ${state.contactName}`);
+          }
+
+          // Add messages to history (except START/STOP triggers)
           for (const msg of newMessages) {
             console.log(`📨 From ${state.contactName}: ${msg.text}`);
 
@@ -528,16 +595,19 @@ async function runAgent() {
               console.log(`   [Reactions: ${reactionEmojis}]`);
             }
 
-            state.conversationHistory.push({
-              role: "user",
-              content: msg.text || "",
-            });
+            // Skip adding START/STOP trigger messages to history
+            if (!msg.text?.includes("START") && !msg.text?.includes("STOP")) {
+              state.conversationHistory.push({
+                role: "user",
+                content: msg.text || "",
+              });
 
-            // Keep history manageable
-            if (state.conversationHistory.length > MAX_HISTORY_LENGTH) {
-              state.conversationHistory = state.conversationHistory.slice(
-                -MAX_HISTORY_LENGTH
-              );
+              // Keep history manageable
+              if (state.conversationHistory.length > MAX_HISTORY_LENGTH) {
+                state.conversationHistory = state.conversationHistory.slice(
+                  -MAX_HISTORY_LENGTH
+                );
+              }
             }
 
             state.lastSeenSortKey = Math.max(
@@ -549,12 +619,12 @@ async function runAgent() {
           // Update last message time
           state.lastMessageTime = Date.now();
 
-          // Check if any message contains "START" (case-insensitive)
-          const shouldRespond = newMessages.some((msg) =>
-            msg.text?.includes("START")
+          // Only queue response if AI is active and there are non-control messages
+          const hasNonControlMessages = newMessages.some(
+            (msg) => !msg.text?.includes("START") && !msg.text?.includes("STOP")
           );
 
-          if (shouldRespond) {
+          if (state.isActive && hasNonControlMessages) {
             // Set debounce timer to queue response after delay
             state.debounceTimer = setTimeout(() => {
               state.debounceTimer = null;
@@ -573,9 +643,9 @@ async function runAgent() {
                 })`
               );
             }, MESSAGE_DEBOUNCE_MS);
-          } else {
+          } else if (!state.isActive && !hasStart) {
             console.log(
-              `⏭️  Skipping ${state.contactName} (no START trigger found)`
+              `⏭️  Skipping ${state.contactName} (AI not active - send START to activate)`
             );
           }
         }
