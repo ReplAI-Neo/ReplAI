@@ -1,6 +1,6 @@
 # Message Parsers for AI Training
 
-Convert your Instagram and iMessage data into OpenAI-compatible chat format for training a model to talk like you. **Both parsers include built-in AES-256 encryption** for secure data storage and uploading to training platforms like Hugging Face.
+Convert your Instagram, iMessage, and Discord data into a standardized universal schema for training a model to talk like you. Includes **AES-256 selective encryption** for secure data storage and uploading to training platforms like Hugging Face.
 
 ## Features
 
@@ -8,21 +8,32 @@ Convert your Instagram and iMessage data into OpenAI-compatible chat format for 
 
 - Parses Instagram's exported message.json files
 - Handles Unicode encoding issues in Instagram exports
-- Converts to OpenAI chat format with proper role assignments for training
+- Converts to universal conversation schema (OpenAI chat format)
 - Supports both individual and group conversations
 - Filters out non-content messages (like "Liked a message")
 - Chronological message ordering
 - Time-based filtering (train on specific date ranges)
-- **AES-256 encryption for secure data protection**
-- Two output modes: combined or separate files
 
 ### iMessage Parser
 
 - Parses iMessage HTML exports (from imessage-exporter)
 - Supports both individual and group conversations
-- Simple, lightweight parser
-- Outputs clean OpenAI chat format
-- **AES-256 encryption for secure data protection**
+- Processes both single files and entire directories
+- Outputs universal conversation schema
+
+### Discord Parser
+
+- Parses Discord exported message data
+- Supports both DMs and group conversations
+- Outputs universal conversation schema
+
+### Encryption Tool
+
+- **Selective field encryption** - encrypts only sensitive message content
+- Leaves metadata unencrypted for analysis (timestamps, participant counts, etc.)
+- AES-256 encryption with Fernet
+- Supports both encryption and decryption
+- Compatible with all parser outputs
 
 ## Installation
 
@@ -38,74 +49,59 @@ pip install cryptography
 
 ## Quick Start
 
-### Instagram Messages
+### 1. Parse Your Messages
 
-#### 1. Generate an encryption key (recommended)
+**Instagram:**
 
 ```bash
-python3 instagram_parser.py --generate-key
+python3 utils/instagram_parser.py data/raw/instagram \
+  --user-name "Your Display Name" \
+  -o data/processed/instagram_parsed.json \
+  --pretty
 ```
 
-Save the displayed key securely in a password manager!
-
-#### 2. Parse and encrypt your messages
+**iMessage:**
 
 ```bash
-python3 instagram_parser.py /path/to/instagram/messages \
-  --user-name "Your Display Name" \
-  --encrypt \
+# First, export your messages (macOS only)
+brew install imessage-exporter
+imessage-exporter -f html -o ~/Desktop/imessage
+
+# Then parse
+python3 utils/imessage_parser.py ~/Desktop/imessage \
+  -o data/processed/imessage_parsed.json \
+  --pretty
+```
+
+**Discord:**
+
+```bash
+python3 utils/discord_parser.py \
+  --data-dir data/raw/discord \
+  --output data/processed/discord_parsed.json \
+  --stats
+```
+
+### 2. (Optional) Encrypt Your Data
+
+For secure upload to training platforms:
+
+```bash
+# Generate an encryption key
+python3 utils/encrypt_conversations.py --generate-key
+
+# Encrypt your parsed data
+python3 utils/encrypt_conversations.py \
+  --encrypt data/processed/instagram_parsed.json \
+  -o data/processed/instagram_encrypted.json \
   --encryption-key "YOUR_KEY_HERE"
-```
-
-Or let it auto-generate a key:
-
-```bash
-python3 instagram_parser.py /path/to/instagram/messages \
-  --user-name "Your Display Name" \
-  --encrypt
 ```
 
 **⚠️ IMPORTANT: Save the encryption key! You'll need it to decrypt your data.**
 
----
+### 3. Use Your Data
 
-### iMessage
-
-#### 1. Export your iMessages
-
-First, install the iMessage exporter:
-
-```bash
-brew install imessage-exporter
-```
-
-Then export your messages to HTML:
-
-```bash
-imessage-exporter -f html -o ~/Desktop/imessage
-```
-
-This will create HTML files for each conversation in `~/Desktop/imessage/`.
-
-#### 2. Parse iMessage HTML files
-
-Parse a single conversation:
-
-```bash
-python3 imsg_parser.py ~/Desktop/imessage/+12345678900.html -o output.json
-```
-
-Parse and encrypt:
-
-```bash
-python3 imsg_parser.py ~/Desktop/imessage/+12345678900.html -o output.json --encrypt
-```
-
-Or print to stdout:
-
-```bash
-python3 imsg_parser.py ~/Desktop/imessage/+12345678900.html
-```
+The parsed output is now ready for training! Each file follows the universal conversation schema with OpenAI-compatible messages.
 
 ## Usage
 
@@ -114,73 +110,63 @@ python3 imsg_parser.py ~/Desktop/imessage/+12345678900.html
 #### Command Line Options
 
 ```bash
-python3 instagram_parser.py <input_dir> --user-name <name> [options]
+python3 utils/instagram_parser.py <input_dir> --user-name <name> -o <output> [options]
 ```
 
 **Required Arguments:**
 
 - `input_dir` - Root directory containing your Instagram message folders
 - `--user-name NAME` - Your display name as it appears in Instagram messages (case-insensitive)
+- `-o, --output FILE` - Output JSON file path
 
 **Optional Arguments:**
 
-- `--format {combined|separate}` - Output format (default: separate)
-  - `combined` - All conversations in one file
-  - `separate` - One file per conversation
-- `--output-dir DIR` - Directory to save output files (default: "output")
-- `--start-time DATE` - Only include messages from this date onward (format: YYYY-MM-DD or unix timestamp)
-- `--end-time DATE` - Only include messages up to this date (format: YYYY-MM-DD or unix timestamp)
-- `--encrypt` - Encrypt output files (highly recommended for uploading to training platforms)
-- `--encryption-key KEY` - Use a specific encryption key (if not provided with --encrypt, generates new key)
-- `--generate-key` - Generate a new encryption key and exit
+- `--start-time DATE` - Only include messages from this date onward (ISO format or unix timestamp)
+- `--end-time DATE` - Only include messages up to this date (ISO format or unix timestamp)
+- `--pretty` - Pretty print JSON output with indentation
+
+**Date Format Examples:**
+
+- ISO date: `2024-01-01` or `2024-01-01T10:30:00`
+- Unix timestamp (seconds): `1704067200`
+- Unix timestamp (milliseconds): `1704067200000`
 
 #### Examples
 
-**Basic parsing with encryption:**
+**Basic parsing:**
 
 ```bash
-python3 instagram_parser.py ./instagram_data \
+python3 utils/instagram_parser.py data/raw/instagram \
   --user-name "John Doe" \
-  --encrypt
-```
-
-**Combine all conversations into one encrypted file:**
-
-```bash
-python3 instagram_parser.py ./instagram_data \
-  --user-name "John Doe" \
-  --format combined \
-  --encrypt
+  -o data/processed/instagram.json
 ```
 
 **Filter by date range:**
 
 ```bash
-python3 instagram_parser.py ./instagram_data \
+python3 utils/instagram_parser.py data/raw/instagram \
   --user-name "John Doe" \
+  -o data/processed/instagram_2024.json \
   --start-time "2024-01-01" \
-  --end-time "2024-12-31" \
-  --encrypt
+  --end-time "2024-12-31"
+```
+
+**Pretty print for readability:**
+
+```bash
+python3 utils/instagram_parser.py data/raw/instagram \
+  --user-name "John Doe" \
+  -o data/processed/instagram.json \
+  --pretty
 ```
 
 **Train on recent conversations only:**
 
 ```bash
-python3 instagram_parser.py ./instagram_data \
+python3 utils/instagram_parser.py data/raw/instagram \
   --user-name "John Doe" \
-  --start-time "2023-01-01" \
-  --format combined \
-  --encrypt
-```
-
-**Use a pre-generated encryption key:**
-
-```bash
-python3 instagram_parser.py ./instagram_data \
-  --user-name "John Doe" \
-  --format combined \
-  --encrypt \
-  --encryption-key "xMzE5NjQ3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MA=="
+  -o data/processed/instagram_recent.json \
+  --start-time "2023-01-01"
 ```
 
 ---
@@ -190,98 +176,46 @@ python3 instagram_parser.py ./instagram_data \
 #### Command Line Options
 
 ```bash
-python3 imsg_parser.py <input_file> [options]
+python3 utils/imessage_parser.py <input_path> -o <output> [options]
 ```
 
 **Required Arguments:**
 
-- `input_file` - Path to HTML file containing iMessage export
+- `input_path` - Path to HTML file or directory containing iMessage HTML exports
+- `-o, --output FILE` - Output JSON file path
 
 **Optional Arguments:**
 
-- `-o, --output FILE` - Output JSON file (default: print to stdout)
 - `--pretty` - Pretty print JSON output with indentation
-- `--encrypt` - Encrypt output file (requires -o/--output)
-- `--encryption-key KEY` - Use a specific encryption key (if not provided with --encrypt, generates new key)
-- `--generate-key` - Generate a new encryption key and exit
 
 #### Examples
 
-**Parse and save to file:**
+**Parse a single conversation:**
 
 ```bash
-python3 imsg_parser.py ~/Desktop/imessage/+12345678900.html -o conversation.json
+python3 utils/imessage_parser.py ~/Desktop/imessage/+12345678900.html \
+  -o data/processed/conversation.json
 ```
 
-**Parse and print to stdout:**
+**Parse an entire directory:**
 
 ```bash
-python3 imsg_parser.py ~/Desktop/imessage/+12345678900.html
+python3 utils/imessage_parser.py ~/Desktop/imessage \
+  -o data/processed/imessage_all.json \
+  --pretty
 ```
 
-**Pretty print:**
+**Pretty print for readability:**
 
 ```bash
-python3 imsg_parser.py ~/Desktop/imessage/+12345678900.html --pretty
-```
-
-**Parse and encrypt:**
-
-```bash
-python3 imsg_parser.py ~/Desktop/imessage/+12345678900.html -o conversation.json --encrypt
-```
-
-**Generate an encryption key:**
-
-```bash
-python3 imsg_parser.py --generate-key
-```
-
-**Use a specific encryption key:**
-
-```bash
-python3 imsg_parser.py ~/Desktop/imessage/+12345678900.html \
-  -o conversation.json \
-  --encrypt \
-  --encryption-key "your-key-here"
-```
-
-**Parse multiple conversations with encryption:**
-
-```bash
-# Generate a key once
-KEY=$(python3 imsg_parser.py --generate-key | tail -1)
-
-# Loop through all HTML files using the same key
-for file in ~/Desktop/imessage/*.html; do
-  output_name=$(basename "$file" .html).json
-  python3 imsg_parser.py "$file" -o "output/$output_name" --encrypt --encryption-key "$KEY"
-done
-
-echo "Encryption key: $KEY"
+python3 utils/imessage_parser.py ~/Desktop/imessage/+12345678900.html \
+  -o data/processed/conversation.json \
+  --pretty
 ```
 
 #### Output Format
 
-The iMessage parser outputs messages in the same format as the Instagram parser:
-
-```json
-[
-  {
-    "role": "user",
-    "content": "Hey, how's it going?"
-  },
-  {
-    "role": "assistant",
-    "content": "Good! What are you up to?"
-  }
-]
-```
-
-**Role Assignment:**
-
-- `assistant` - **Your messages** (sender = "Me") - what the model learns to imitate
-- `user` - **Everyone else's messages** - the prompts/context
+See the [Universal Schema](#output-format) section below for the complete output format.
 
 ---
 
@@ -303,7 +237,7 @@ To download your Instagram data from Meta Accounts Center:
    - **Media quality:** Adjust the quality for photos and videos
 10. **Submit your request** by tapping "Create files" or "Start export"
 11. **Wait for the download** - You'll be notified via email when it's ready (can take a few hours to days)
-12. **Extract the zip file** and look for the `messages` or `inbox` folder
+12. **Extract the zip file** and navigate to the `/your_instagram_activity/messages/inbox` subfolder
 
 ## How to Get Your iMessage Data
 
@@ -352,37 +286,75 @@ imessage-exporter --help
 
 ## Output Format
 
-The script converts messages to this format:
+All parsers output a **universal conversation schema** - a standardized JSON format compatible across Instagram, iMessage, and Discord sources.
+
+### Universal Schema Structure
+
+The output is a JSON array where each element represents one conversation:
 
 ```json
-{
-  "messages": [
-    {
-      "role": "user",
-      "content": "Hey, how's it going?"
-    },
-    {
-      "role": "assistant",
-      "content": "Good! What are you up to?"
-    },
-    {
-      "role": "user",
-      "content": "What are you working on?"
-    },
-    {
-      "role": "assistant",
-      "content": "Just coding some cool stuff!"
-    }
-  ]
-}
+[
+  {
+    "openai_messages": [
+      {
+        "role": "user",
+        "content": "Hey, how's it going?"
+      },
+      {
+        "role": "assistant",
+        "content": "Good! What are you up to?"
+      }
+    ],
+    "full_metadata_messages": [
+      {
+        "message_id": "123",
+        "timestamp": "2024-01-01T10:00:00.000+00:00",
+        "content": "Hey, how's it going?",
+        "author": "Friend"
+      },
+      {
+        "message_id": "124",
+        "timestamp": "2024-01-01T10:00:05.000+00:00",
+        "content": "Good! What are you up to?",
+        "author": "You"
+      }
+    ],
+    "first_message_timestamp": "2024-01-01T10:00:00.000+00:00",
+    "last_message_timestamp": "2024-01-01T10:00:05.000+00:00",
+    "recipients": ["Friend"],
+    "num_participants": 2,
+    "total_messages": 2,
+    "source": "instagram",
+    "chat_type": "direct"
+  }
+]
 ```
+
+### Field Descriptions
+
+**OpenAI-Compatible Messages:**
+
+- `openai_messages` - Simplified format ready for training, containing only `role` and `content`
+
+**Full Metadata:**
+
+- `full_metadata_messages` - Complete message data with all metadata preserved (IDs, timestamps, authors)
+
+**Conversation Metadata:**
+
+- `first_message_timestamp` / `last_message_timestamp` - ISO 8601 format timestamps
+- `recipients` - List of participant names (excluding yourself)
+- `num_participants` - Total unique participants including yourself
+- `total_messages` - Total message count in this conversation
+- `source` - Where the data came from: `"instagram"`, `"imessage"`, or `"discord"`
+- `chat_type` - Either `"direct"` (1-on-1) or `"group"` (3+ people)
 
 **Role Assignment for Training:**
 
-- `assistant` - **Your messages** (the specified --user-name) - this is what the model learns to imitate
-- `user` - **Everyone else's messages** - these are the prompts/context the model responds to
+- `assistant` - **Your messages** - what the model learns to imitate
+- `user` - **Everyone else's messages** - the prompts/context the model responds to
 
-This role assignment is designed for training a model to talk like you. Your messages become the "assistant" responses that the model learns to generate.
+This role assignment trains a model to talk like you. Your messages become the "assistant" responses that the model learns to generate.
 
 ---
 
@@ -398,9 +370,29 @@ When training models on platforms like Hugging Face, your data files may be:
 
 Encryption ensures your personal conversations remain private, even if the encrypted files are leaked.
 
-### How It Works
+### Selective Encryption
 
-The script uses **Fernet** (symmetric encryption) which provides:
+Our encryption tool uses **selective field encryption** - it encrypts only the sensitive message content while leaving metadata unencrypted. This allows you to:
+
+- ✅ Analyze conversation statistics without decryption
+- ✅ View timestamps, participant counts, and source information
+- ✅ Keep actual message content completely private
+- ✅ Train models securely on encrypted platforms
+
+**What Gets Encrypted:**
+
+- `openai_messages` - The training-ready message format
+- `full_metadata_messages` - Complete message data with metadata
+
+**What Stays Unencrypted:**
+
+- `first_message_timestamp` / `last_message_timestamp`
+- `recipients`, `num_participants`, `total_messages`
+- `source`, `chat_type`
+
+### Encryption Technology
+
+Uses **Fernet** (symmetric encryption) which provides:
 
 - AES-256 encryption
 - Built-in authentication (prevents tampering)
@@ -408,10 +400,20 @@ The script uses **Fernet** (symmetric encryption) which provides:
 
 ### Encryption Workflow
 
-#### Step 1: Generate a Key (Optional but Recommended)
+#### Step 1: Parse Your Messages
+
+First, parse your data (encryption is a separate step):
 
 ```bash
-python3 instagram_parser.py --generate-key
+python3 utils/instagram_parser.py data/raw/instagram \
+  --user-name "Your Name" \
+  -o data/processed/instagram.json
+```
+
+#### Step 2: Generate an Encryption Key
+
+```bash
+python3 utils/encrypt_conversations.py --generate-key
 ```
 
 Outputs:
@@ -419,66 +421,90 @@ Outputs:
 ```
 Generated encryption key (save this securely!):
 xMzE5NjQ3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MA==
-
-Use this key with: --encryption-key YOUR_KEY
-⚠️  Keep this key safe! You'll need it to decrypt your data.
 ```
 
 **Save this key in a password manager!**
 
-#### Step 2: Parse and Encrypt
+#### Step 3: Encrypt Your Parsed Data
 
-With your own key:
+With your generated key:
 
 ```bash
-python3 instagram_parser.py ~/instagram/messages \
-  --user-name "krish" \
-  --format combined \
-  --encrypt \
+python3 utils/encrypt_conversations.py \
+  --encrypt data/processed/instagram.json \
+  -o data/processed/instagram_encrypted.json \
   --encryption-key "YOUR_KEY_HERE"
 ```
 
-Or let it auto-generate:
+Or let it auto-generate a key:
 
 ```bash
-python3 instagram_parser.py ~/instagram/messages \
-  --user-name "krish" \
-  --format combined \
-  --encrypt
+python3 utils/encrypt_conversations.py \
+  --encrypt data/processed/instagram.json \
+  -o data/processed/instagram_encrypted.json
 ```
 
-#### Step 3: Upload to Hugging Face
+The tool will display the generated key - **save it securely!**
 
-Your encrypted files are now safe to upload! Even if someone accesses them, they can't read the content without your key.
+#### Step 4: Upload to Hugging Face
 
-#### Step 4: Decrypt for Training
+Your encrypted files are now safe to upload! Even if someone accesses them, they can't read the message content without your key.
 
-On your training platform, decrypt the files programmatically:
+**Example encrypted file structure:**
+
+```json
+[
+  {
+    "first_message_timestamp": "2024-01-01T10:00:00.000+00:00",
+    "recipients": ["Friend"],
+    "num_participants": 2,
+    "total_messages": 50,
+    "source": "instagram",
+    "chat_type": "direct",
+    "openai_messages_encrypted": "gAAAAABp...(encrypted data)...",
+    "full_metadata_messages_encrypted": "gAAAAABp...(encrypted data)...",
+    "_encrypted": true
+  }
+]
+```
+
+#### Step 5: Decrypt for Training
+
+On your training platform or locally:
+
+```bash
+python3 utils/encrypt_conversations.py \
+  --decrypt data/processed/instagram_encrypted.json \
+  -o data/processed/instagram_decrypted.json \
+  --encryption-key "YOUR_KEY_HERE"
+```
+
+Or programmatically in Python:
 
 ```python
 from cryptography.fernet import Fernet
 import json
 
-# Read and decrypt the file
-with open('all_messages_combined.json', 'rb') as f:
-    encrypted_data = f.read()
+# Load encrypted file
+with open('instagram_encrypted.json') as f:
+    data = json.load(f)
 
+# Decrypt message fields
 cipher = Fernet(b'YOUR_KEY_HERE')
-decrypted_data = cipher.decrypt(encrypted_data)
 
-# Parse the decrypted JSON
-data = json.loads(decrypted_data)
-messages = data['messages']
-```
+for conversation in data:
+    if conversation.get('_encrypted'):
+        # Decrypt OpenAI messages
+        encrypted = conversation['openai_messages_encrypted'].encode()
+        decrypted = cipher.decrypt(encrypted)
+        conversation['openai_messages'] = json.loads(decrypted)
 
-#### Step 5: Decrypt Locally (if needed)
+        # Decrypt full metadata
+        encrypted = conversation['full_metadata_messages_encrypted'].encode()
+        decrypted = cipher.decrypt(encrypted)
+        conversation['full_metadata_messages'] = json.loads(decrypted)
 
-To decrypt files on your local machine:
-
-```bash
-python3 decrypt_messages.py encrypted_file.json \
-  --encryption-key "YOUR_KEY" \
-  --output decrypted.json
+# Now use data['openai_messages'] for training
 ```
 
 ### Security Best Practices
@@ -514,16 +540,16 @@ xMzE5NjQ3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MA==
 
 ```bash
 # In your ~/.zshrc or ~/.bashrc
-export INSTAGRAM_ENCRYPTION_KEY="xMzE5NjQ3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MA=="
+export ENCRYPTION_KEY="xMzE5NjQ3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MA=="
 ```
 
 Then use:
 
 ```bash
-python3 instagram_parser.py ./data \
-  --user-name "Your Name" \
-  --encrypt \
-  --encryption-key "$INSTAGRAM_ENCRYPTION_KEY"
+python3 utils/encrypt_conversations.py \
+  --encrypt data/processed/parsed.json \
+  -o data/processed/encrypted.json \
+  --encryption-key "$ENCRYPTION_KEY"
 ```
 
 **Option 3: Encrypted Notes**
@@ -534,7 +560,7 @@ Store in Apple Notes (with encryption), Notion, or any encrypted note-taking app
 
 ## Time Filtering
 
-Filter messages by date to train on specific time periods:
+Filter messages by date to train on specific time periods (Instagram parser only):
 
 ### Supported Date Formats
 
@@ -546,23 +572,23 @@ Filter messages by date to train on specific time periods:
 
 ```bash
 # Only recent conversations (last year)
-python3 instagram_parser.py ./messages \
+python3 utils/instagram_parser.py data/raw/instagram \
   --user-name "You" \
-  --start-time "2024-01-01" \
-  --encrypt
+  -o data/processed/instagram_2024.json \
+  --start-time "2024-01-01"
 
 # Specific time period (college years)
-python3 instagram_parser.py ./messages \
+python3 utils/instagram_parser.py data/raw/instagram \
   --user-name "You" \
+  -o data/processed/instagram_college.json \
   --start-time "2019-09-01" \
-  --end-time "2023-05-31" \
-  --encrypt
+  --end-time "2023-05-31"
 
 # Everything up to a certain date
-python3 instagram_parser.py ./messages \
+python3 utils/instagram_parser.py data/raw/instagram \
   --user-name "You" \
-  --end-time "2022-12-31" \
-  --encrypt
+  -o data/processed/instagram_old.json \
+  --end-time "2022-12-31"
 ```
 
 **Note:** All dates are interpreted as UTC (to match Instagram's timestamp format). Filters are inclusive.
@@ -637,43 +663,50 @@ pip install cryptography
 ## Complete End-to-End Example
 
 ```bash
-# 1. Generate and save a key
-python3 instagram_parser.py --generate-key
+# 1. Parse your Instagram messages
+python3 utils/instagram_parser.py data/raw/instagram \
+  --user-name "krish" \
+  -o data/processed/instagram_2023.json \
+  --start-time "2023-01-01" \
+  --pretty
+
+# 2. Generate an encryption key
+python3 utils/encrypt_conversations.py --generate-key
 # Save the key displayed!
 
-# 2. Parse and encrypt your Instagram messages
-python3 instagram_parser.py ~/Downloads/instagram/messages \
-  --user-name "krish" \
-  --format combined \
-  --start-time "2023-01-01" \
-  --encrypt \
-  --encryption-key "YOUR_KEY_HERE" \
-  --output-dir ./encrypted_training_data
+# 3. Encrypt your parsed data
+python3 utils/encrypt_conversations.py \
+  --encrypt data/processed/instagram_2023.json \
+  -o data/processed/instagram_2023_encrypted.json \
+  --encryption-key "YOUR_KEY_HERE"
 
-# 3. Upload encrypted files to Hugging Face
-# Files in ./encrypted_training_data/ are now encrypted and safe to upload
+# 4. Upload encrypted file to Hugging Face
+# data/processed/instagram_2023_encrypted.json is now safe to upload!
+# Metadata is readable, but message content is encrypted
 
-# 4. In your training script on Hugging Face:
+# 5. In your training script on Hugging Face:
 # Decrypt programmatically using the key (see Python example above)
 
-# 5. Later: decrypt locally if needed
-python3 decrypt_messages.py encrypted_training_data/all_messages_combined.json \
-  --encryption-key "YOUR_KEY_HERE" \
-  --output readable_data.json
+# 6. Later: decrypt locally if needed
+python3 utils/encrypt_conversations.py \
+  --decrypt data/processed/instagram_2023_encrypted.json \
+  -o data/processed/instagram_2023_decrypted.json \
+  --encryption-key "YOUR_KEY_HERE"
 ```
 
 ---
 
 ## Tips
 
-1. **Always encrypt** when uploading to training platforms
-2. **Use combined mode** when creating a single training dataset
-3. **Use time filters** to focus on specific eras of your communication style
-4. **Start with separate mode** to inspect individual conversations first
-5. **Save encryption keys securely** - use a password manager
+1. **Parse first, encrypt later** - Keep separate parsing and encryption steps for flexibility
+2. **Use time filters** (Instagram) to focus on specific eras of your communication style
+3. **Always encrypt** when uploading to training platforms like Hugging Face
+4. **Save encryption keys securely** - use a password manager (1Password, Bitwarden, etc.)
+5. **Use `--pretty` flag** when parsing to make output files human-readable
 6. **Check encoding** - Emojis should appear correctly (😍, 🎉, ❤️)
 7. **Verify output** before using for training/analysis
 8. **Privacy first** - Remember to review and redact any sensitive information
+9. **Metadata stays readable** - You can analyze conversation stats without decrypting
 
 ---
 

@@ -2,14 +2,17 @@
 set -e  # Exit on error
 set -u  # Exit on undefined variable
 
-# process
+# Navigate to project root
+cd "$(dirname "$0")/.." || exit 1
+
+# Process conversations
 echo "Step 1/5: Processing conversations..."
-# bash utils/parse_discord.sh
-# bash parse_imessage.sh
-# bash parse_instagram.sh
+bash utils/parse_discord.sh
+bash utils/parse_imessage.sh
+bash utils/parse_instagram.sh
 echo "✓ Processing complete"
 
-# merge
+# Merge all processed conversations
 echo "Step 2/5: Merging conversations..."
 python utils/merge.py data/processed -o data/merged/all_conversations.json
 if [ ! -f "data/merged/all_conversations.json" ]; then
@@ -18,7 +21,7 @@ if [ ! -f "data/merged/all_conversations.json" ]; then
 fi
 echo "✓ Merge complete"
 
-# partition
+# Partition into training chunks
 echo "Step 3/5: Partitioning conversations..."
 python utils/partition.py data/merged/all_conversations.json -o data/merged/all_conversations_partitioned.json --max-days 7
 if [ ! -f "data/merged/all_conversations_partitioned.json" ]; then
@@ -27,7 +30,7 @@ if [ ! -f "data/merged/all_conversations_partitioned.json" ]; then
 fi
 echo "✓ Partition complete"
 
-# filter
+# Filter conversations
 echo "Step 4/5: Filtering conversations..."
 python utils/filter.py data/merged/all_conversations_partitioned.json data/merged/all_conversations_partitioned_filtered.json \
   --start-date "2023-01-01T00:00:00+00:00" \
@@ -45,12 +48,11 @@ if [ ! -f "data/merged/all_conversations_partitioned_filtered.json" ]; then
 fi
 echo "✓ Filter complete"
 
-# encrypt
+# Encrypt the data (auto-generates encryption key)
 echo "Step 5/5: Encrypting conversations..."
-# TODO: Add encryption step
+python utils/encrypt_conversations.py --encrypt data/merged/all_conversations_partitioned.json -o data/merged/all_conversations_encrypted.json
+
+# Upload
+# TODO: Add upload step (Hugging Face)
 
 echo "All steps completed successfully!"
-
-# upload
-# TODO: Add upload step
-# hf 

@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 import argparse
-from encryption_utils import generate_encryption_key, encrypt_file
 
 
 def fix_instagram_encoding(text: str) -> str:
@@ -229,18 +228,19 @@ def main():
 
     parser.add_argument(
         "input_dir",
-        nargs="?",
         help="Root directory containing Instagram message folders",
     )
 
     parser.add_argument(
         "--user-name",
+        required=True,
         help="Your name as it appears in Instagram messages (case-insensitive)",
     )
 
     parser.add_argument(
         "-o",
         "--output",
+        required=True,
         help="Output JSON file",
         metavar="FILE",
     )
@@ -259,43 +259,7 @@ def main():
         "--pretty", action="store_true", help="Pretty print JSON output"
     )
 
-    parser.add_argument(
-        "--encrypt",
-        action="store_true",
-        help="Encrypt output file with AES-256",
-    )
-
-    parser.add_argument(
-        "--encryption-key",
-        help="Encryption key (base64-encoded). If not provided with --encrypt, generates new key.",
-    )
-
-    parser.add_argument(
-        "--generate-key",
-        action="store_true",
-        help="Generate a new encryption key and exit",
-    )
-
     args = parser.parse_args()
-
-    # Handle key generation mode
-    if args.generate_key:
-        key = generate_encryption_key()
-        print("Generated encryption key (save this securely!):")
-        print(key)
-        print("\nUse this key with: --encryption-key YOUR_KEY")
-        print("Keep this key safe! You'll need it to decrypt your data.")
-        return
-
-    # Validate required arguments when not generating key
-    if not args.input_dir:
-        parser.error("input_dir is required (unless using --generate-key)")
-
-    if not args.user_name:
-        parser.error("--user-name is required (unless using --generate-key)")
-
-    if not args.output:
-        parser.error("-o/--output is required (unless using --generate-key)")
 
     if not os.path.exists(args.input_dir):
         print(f"Error: Directory '{args.input_dir}' does not exist")
@@ -319,20 +283,6 @@ def main():
             print(f"Error: {e}")
             return
 
-    # Handle encryption key
-    encryption_key = None
-    if args.encrypt:
-        if args.encryption_key:
-            encryption_key = args.encryption_key
-        else:
-            encryption_key = generate_encryption_key()
-            print("\n" + "=" * 60)
-            print("🔑 GENERATED NEW ENCRYPTION KEY (SAVE THIS SECURELY!):")
-            print(encryption_key)
-            print("=" * 60)
-            print("⚠️  You MUST save this key to decrypt your data later!")
-            print("=" * 60 + "\n")
-
     # Parse messages
     print(f"\nParsing Instagram messages from: {args.input_dir}")
     print(f"User name: {args.user_name}")
@@ -344,7 +294,6 @@ def main():
         print(
             f"End time: {datetime.fromtimestamp(end_time_ms / 1000).strftime('%Y-%m-%d %H:%M:%S')}"
         )
-    print(f"Encryption: {'ENABLED' if encryption_key else 'disabled'}")
     print("=" * 60)
 
     conversations = parse_all_messages(
@@ -366,18 +315,7 @@ def main():
         else:
             json.dump(conversations, f, ensure_ascii=False)
 
-    # Encrypt if requested
-    if encryption_key:
-        try:
-            encrypt_file(output_path, encryption_key)
-            print(
-                f"\n✓ Successfully parsed and encrypted {len(conversations)} conversation(s)"
-            )
-        except Exception as e:
-            print(f"\n✓ Successfully parsed {len(conversations)} conversation(s)")
-            print(f"✗ Encryption failed: {e}")
-    else:
-        print(f"\n✓ Successfully parsed {len(conversations)} conversation(s)")
+    print(f"\n✓ Successfully parsed {len(conversations)} conversation(s)")
 
     # Print summary
     total_messages = sum(conv["total_messages"] for conv in conversations)
