@@ -426,7 +426,7 @@ async function runAgent() {
   const beeper = new BeeperDesktop({ accessToken: beeperToken });
   const openai = new OpenAI({ apiKey: openaiKey });
 
-  console.log("🤖 AI Agent V2 started");
+  console.log("🤖 AI Agent V3 started");
   console.log("📱 Monitoring ALL chats for unread messages");
   console.log(`📊 Max queue size: ${MAX_QUEUE_SIZE}`);
   console.log("Press Ctrl+C to stop\n");
