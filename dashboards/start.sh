@@ -1,1 +1,1 @@
-python dashboards/style_dashboard.py --embedding-backend sentence-transformers
+python style_dashboard.py --embedding-backend sentence-transformers
